@@ -7,4 +7,4 @@
 2. Run backend :
   ```bash
   python3 main.py 
-  ```# inventic-assignment
+  ```
