@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import './App.css';
 import NewsCard from './components/NewsCard';
 import SearchBar from './components/SearchBar';
@@ -15,11 +15,14 @@ export interface NewsArticle {
   date?: string;
 }
 
+type TimeFilterOption = 'all' | 'day' | 'week' | 'month' | 'year';
+
 function App() {
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [articles, setArticles] = useState<NewsArticle[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [timeFilter, setTimeFilter] = useState<TimeFilterOption>('all');
   
   // Debounce search function
   const debounce = (func: Function, delay: number) => {
@@ -33,7 +36,7 @@ function App() {
   };
 
   // Search articles function
-  const searchArticles = useCallback(async (name: string) => {
+  const searchArticles = useCallback(async (name: string, timeFrame: TimeFilterOption = 'all') => {
     if (!name.trim()) {
       setArticles([]);
       return;
@@ -43,7 +46,8 @@ function App() {
     setError(null);
     
     try {
-      const response = await fetch(`/api/search?name=${encodeURIComponent(name)}`);
+      const url = `/api/search?name=${encodeURIComponent(name)}${timeFrame !== 'all' ? `&timeframe=${timeFrame}` : ''}`;
+      const response = await fetch(url);
       
       if (!response.ok) {
         throw new Error(`Search failed: ${response.statusText}`);
@@ -60,10 +64,17 @@ function App() {
     }
   }, []);
 
+  // Effect to re-search when time filter changes
+  useEffect(() => {
+    if (searchTerm.trim()) {
+      searchArticles(searchTerm, timeFilter);
+    }
+  }, [timeFilter, searchArticles, searchTerm]);
+
   // Debounced version of searchArticles
   const debouncedSearch = useCallback(
-    debounce((term: string) => searchArticles(term), 500),
-    [searchArticles]
+    debounce((term: string) => searchArticles(term, timeFilter), 500),
+    [searchArticles, timeFilter]
   );
 
   // Handle search input changes
@@ -75,7 +86,12 @@ function App() {
   // Handle form submit
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    searchArticles(searchTerm);
+    searchArticles(searchTerm, timeFilter);
+  };
+
+  // Handle time filter change
+  const handleTimeFilterChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setTimeFilter(e.target.value as TimeFilterOption);
   };
 
   return (
@@ -96,6 +112,22 @@ function App() {
               onSearchChange={handleSearchChange} 
               onSubmit={handleSubmit} 
             />
+            
+            {searchTerm && (
+              <div className="mt-4">
+                <select
+                  value={timeFilter}
+                  onChange={handleTimeFilterChange}
+                  className="px-3 py-2 bg-white border border-slate-200 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                >
+                  <option value="all">All Time</option>
+                  <option value="day">Past 24 Hours</option>
+                  <option value="week">Past Week</option>
+                  <option value="month">Past Month</option>
+                  <option value="year">Past Year</option>
+                </select>
+              </div>
+            )}
           </div>
           
           {isLoading && <LoadingSpinner />}
